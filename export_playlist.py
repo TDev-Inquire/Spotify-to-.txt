@@ -28,7 +28,8 @@ sp = spotipy.Spotify(auth_manager=auth_manager)
 playlist_url = input('Enter the Spotify playlist link: ')
 
 # Extract the playlist id from the URL
-playlist_id = playlist_url.split('/')[-1]
+playlist_id = playlist_url.split('playlist/')[-1].split('?')[0]
+
 
 # Fetch the playlist data
 playlist = sp.playlist(playlist_id)
