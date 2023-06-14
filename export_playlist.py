@@ -26,9 +26,19 @@ def get_playlist_id(url):
     playlist_id = parsed.path.split('/')[-1]
     return playlist_id
 
-def save_playlist(playlist, file_path):
-    with open(file_path, 'w') as file:
-        for item in playlist['tracks']['items']:
+def save_playlist(sp, playlist_id, file_path):
+    # First 100 items
+    results = sp.playlist_items(playlist_id)
+    tracks = results['items']
+    
+    # Fetch the rest
+    while results['next']:
+        results = sp.next(results)
+        tracks.extend(results['items'])
+    
+    # Save all tracks to file
+    with open(file_path, 'w', encoding='utf-8') as file:
+        for item in tracks:
             track = item['track']
             file.write(f"{track['name']} - {track['artists'][0]['name']}\n")
 
@@ -42,17 +52,21 @@ def main():
         client_secret=credentials['Client Secret'], 
         redirect_uri=credentials['Redirect URI'], 
         scope=scope))
-    
-    # Get playlist
-    playlist_url = input('Enter the Spotify playlist link: ')
-    playlist_id = get_playlist_id(playlist_url)
-    playlist = sp.playlist(playlist_id)
 
-    # Save playlist to file
-    playlist_name = playlist['name']
-    output_dir = os.path.join(os.getcwd(), 'playlists')
-    os.makedirs(output_dir, exist_ok=True)
-    save_playlist(playlist, os.path.join(output_dir, f'{playlist_name}.txt'))
+    while True:
+        # Get playlist
+        playlist_url = input('Enter the Spotify playlist link (or "quit" to stop): ')
+        if playlist_url.lower() == 'quit':
+            break
+        
+        playlist_id = get_playlist_id(playlist_url)
+        playlist = sp.playlist(playlist_id)
+
+        # Save playlist to file
+        playlist_name = playlist['name']
+        output_dir = os.path.join(os.getcwd(), 'playlists')
+        os.makedirs(output_dir, exist_ok=True)
+        save_playlist(sp, playlist_id, os.path.join(output_dir, f'{playlist_name}.txt'))
 
 if __name__ == "__main__":
     main()
