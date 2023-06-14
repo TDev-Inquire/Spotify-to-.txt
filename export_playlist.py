@@ -1,45 +1,58 @@
+import os
+import json
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import getpass
+from urllib.parse import urlparse, parse_qs
 
-print("This program requires Spotify Developer credentials to access the Spotify Web API.")
-print("To get these credentials:")
-print("1. Visit the Spotify Developer Dashboard (https://developer.spotify.com/dashboard/)")
-print("2. Click on 'CREATE AN APP'")
-print("3. Fill out the necessary information and click 'CREATE'")
-print("4. Your Client ID and Client Secret will be shown on the next page")
+def get_credentials():
+    if os.path.isfile('credentials.json'):
+        with open('credentials.json', 'r') as f:
+            credentials = json.load(f)
+    else:
+        credentials = {}
+        credentials['Client ID'] = input('Please enter your Client ID: ')
+        credentials['Client Secret'] = input('Please enter your Client Secret: ')
+        credentials['Redirect URI'] = input('Enter a Redirect URI. This can be any valid URL (e.g., http://localhost/): ')
 
-# Obtain the Spotify developer credentials from the user
-client_id = getpass.getpass('Please enter your Client ID: ')
-client_secret = getpass.getpass('Please enter your Client Secret: ')
+        with open('credentials.json', 'w') as f:
+            json.dump(credentials, f)
+    
+    return credentials
 
-# Get the redirect URI from the user
-print("Enter a Redirect URI. This can be any valid URL (e.g., http://localhost/)")
-redirect_uri = input('Redirect URI: ')
+def get_playlist_id(url):
+    # Parse the URL
+    parsed = urlparse(url)
+    # Get the ID
+    playlist_id = parsed.path.split('/')[-1]
+    return playlist_id
 
-# Set up Spotify OAuth
-scope = 'playlist-read-private'
-auth_manager = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope=scope)
+def save_playlist(playlist, file_path):
+    with open(file_path, 'w') as file:
+        for item in playlist['tracks']['items']:
+            track = item['track']
+            file.write(f"{track['name']} - {track['artists'][0]['name']}\n")
 
-# Initialize Spotify client
-sp = spotipy.Spotify(auth_manager=auth_manager)
+def main():
+    credentials = get_credentials()
+    
+    # Spotify API setup
+    scope = "playlist-read-private"
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+        client_id=credentials['Client ID'], 
+        client_secret=credentials['Client Secret'], 
+        redirect_uri=credentials['Redirect URI'], 
+        scope=scope))
+    
+    # Get playlist
+    playlist_url = input('Enter the Spotify playlist link: ')
+    playlist_id = get_playlist_id(playlist_url)
+    playlist = sp.playlist(playlist_id)
 
-# Get the playlist URL from the user
-playlist_url = input('Enter the Spotify playlist link: ')
+    # Save playlist to file
+    playlist_name = playlist['name']
+    output_dir = os.path.join(os.getcwd(), 'playlists')
+    os.makedirs(output_dir, exist_ok=True)
+    save_playlist(playlist, os.path.join(output_dir, f'{playlist_name}.txt'))
 
-# Extract the playlist id from the URL
-playlist_id = playlist_url.split('playlist/')[-1].split('?')[0]
-
-
-# Fetch the playlist data
-playlist = sp.playlist(playlist_id)
-
-# Open a file to write the songs to
-with open(f'{playlist["name"]}.txt', 'w') as f:
-    # Go through each track in the playlist
-    for item in playlist['tracks']['items']:
-        track = item['track']
-        # Write the track to the file in the format "song title - artist"
-        f.write(f'{track["name"]} - {track["artists"][0]["name"]}\n')
-
-print(f'Successfully exported playlist "{playlist["name"]}"')
+if __name__ == "__main__":
+    main()
